@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>CHEMONE 품목 조회</title>
-  <link rel="icon" href="C-favicon.ico" type="image/x-icon" />
   <style>
     @font-face {
       font-family: 'BladeRunner';
@@ -15,7 +14,7 @@
     }
     body {
       font-family: 'NanumSquareNeo', sans-serif;
-      background-color: #f7f7f7;
+      background-color: #f4f4f9;
       padding: 2rem;
       max-width: 1200px;
       margin: auto;
@@ -26,39 +25,28 @@
     }
     .chemone {
       font-family: 'BladeRunner', sans-serif;
-      color: #113597;
+      color: #1e40af;
     }
-    .category-info {
-      background: #eef2ff;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      border-left: 6px solid #3b82f6;
-      font-size: 0.95rem;
+    .upload-section, .multi-search-section {
+      margin: 1rem 0;
     }
-    .upload-section, .search-bar {
+    .cas-row {
       display: flex;
-      flex-wrap: wrap;
       gap: 0.5rem;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
-    input[type="file"], input[type="text"] {
+    input[type="text"], input[type="file"] {
       padding: 0.5rem;
       font-size: 1rem;
-      min-width: 200px;
+      flex: 1;
     }
     button {
       padding: 0.5rem 1rem;
-      background-color: #1d4ed8;
+      background-color: #2563eb;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-    }
-    .casInputWrapper {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
     }
     details {
       background: white;
@@ -71,195 +59,205 @@
       font-weight: bold;
       cursor: pointer;
     }
-    table.item-table {
+    summary.red {
+      color: red;
+    }
+    table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 0.5rem;
-      font-size: 0.95rem;
     }
-    .item-table th, .item-table td {
+    th, td {
       border: 1px solid #ddd;
-      padding: 0.5rem;
+      padding: 0.4rem;
       text-align: left;
+      font-size: 0.9rem;
     }
-    .item-table th {
-      background-color: #f1f5f9;
+    th {
+      background-color: #eff6ff;
     }
-    .red-text {
+    td.danger {
       color: red;
-      font-weight: bold;
+    }
+    .not-found {
+      background: #fff0f0;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+      padding: 1rem;
+      margin-top: 2rem;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="data.js"></script>
 </head>
 <body>
   <h1><span class="chemone">CHEMONE</span> 품목 조회</h1>
 
-  <div class="category-info">
-    <strong>카테고리:</strong><br>
-    ▸ <b>CAS No.</b>, 품목그룹, 품목코드, 브랜드, 구매처, 품목명, 품목이슈, NCIS,<br>
-    ▸ 유해화학물 판매업신고, 유해화학물 시약판매업신고, 비고
-  </div>
-
   <div class="upload-section">
     <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" />
-    <button onclick="downloadExcel()">결과 엑셀 다운로드</button>
-    <button onclick="resetSearch()">초기화</button>
+    <button onclick="downloadExcel()">엑셀 다운로드</button>
   </div>
 
-  <div class="search-bar" id="searchContainer">
-    <div class="casInputWrapper">
-      <input type="text" class="casInput" placeholder="CAS No. 입력" />
-      <button onclick="addInput()">+</button>
+  <div class="multi-search-section">
+    <div id="casContainer">
+      <div class="cas-row">
+        <input type="text" class="casInput" placeholder="CAS No. 입력" />
+        <button onclick="addCASInput()">＋</button>
+      </div>
     </div>
+    <button onclick="applyMultipleCASSearch()">검색</button>
+    <button onclick="applyReset()">초기화</button>
   </div>
-  <button onclick="applyMultipleCASSearch()">검색</button>
 
   <div id="resultsContainer"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="data.js"></script>
   <script>
     const resultsContainer = document.getElementById('resultsContainer');
-    const searchContainer = document.getElementById('searchContainer');
     let filteredData = [];
 
-    function addInput() {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'casInputWrapper';
-      wrapper.innerHTML = '<input type="text" class="casInput" placeholder="CAS No. 입력" /> <button onclick="this.parentElement.remove()">-</button>';
-      searchContainer.appendChild(wrapper);
+    function findKey(obj, targetKey) {
+      return Object.keys(obj).find(k =>
+        k.replace(/\\s/g, '').toLowerCase() === targetKey.replace(/\\s/g, '').toLowerCase()
+      );
     }
 
-    function normalizeKey(key) {
-      return key.replace(/\s+/g, '').replace(/[^a-zA-Z가-힣0-9]/g, '').toLowerCase();
-    }
-
-    function findKey(item, targetKey) {
-      return Object.keys(item).find(k => normalizeKey(k) === normalizeKey(targetKey));
+    function addCASInput() {
+      const div = document.createElement('div');
+      div.className = 'cas-row';
+      div.innerHTML = '<input type="text" class="casInput" placeholder="CAS No. 입력" /> <button onclick="this.parentNode.remove()">－</button>';
+      document.getElementById('casContainer').appendChild(div);
     }
 
     function applyMultipleCASSearch() {
       const inputs = document.querySelectorAll('.casInput');
-      const keywords = Array.from(inputs).map(i => i.value.trim().toLowerCase()).filter(Boolean);
+      const keywords = Array.from(inputs)
+        .map(i => i.value.trim().toLowerCase())
+        .filter(Boolean);
 
+      const matchedSet = new Set();
       filteredData = window.DATA.filter(item => {
-        return keywords.some(kw => {
-          const key = findKey(item, 'CAS No.');
-          const value = key ? item[key] : '';
-          return typeof value === 'string' && value.toLowerCase() === kw;
-        });
+        const key = findKey(item, 'CAS No.');
+        const value = key ? item[key]?.toString().trim().toLowerCase() : '';
+        const matched = keywords.includes(value);
+        if (matched) matchedSet.add(value);
+        return matched;
       });
 
-      renderAccordion();
+      const unmatched = keywords.filter(kw => !matchedSet.has(kw));
+      renderAccordion(unmatched);
     }
 
-    function renderAccordion() {
+    function renderAccordion(unmatchedCAS = []) {
       resultsContainer.innerHTML = '';
       if (filteredData.length === 0) {
         resultsContainer.innerHTML = '<p>검색 결과가 없습니다.</p>';
-        return;
       }
 
       const grouped = {};
       filteredData.forEach(item => {
         const casKey = findKey(item, 'CAS No.');
-        const cas = casKey ? (item[casKey] || '').trim() : '[CAS 키 없음]';
+        const cas = casKey ? (item[casKey] || '').trim() : '[CAS 없음]';
         if (!grouped[cas]) grouped[cas] = [];
         grouped[cas].push(item);
       });
 
       Object.entries(grouped).forEach(([cas, items]) => {
-        const hasDanger = items.some(item => {
-          const fields = ['유해화학물 판매업신고', '유해화학물 시약판매업신고', '품목그룹', 'NCIS'];
-          return fields.some(field => {
-            const k = findKey(item, field);
-            const v = item[k] || '';
-            return typeof v === 'string' && (v.includes('유해') || v.includes('유독'));
+        const danger = items.some(item => {
+          return ['유해화학물판매업신고', '유해화학물시약판매업신고', '품목그룹', 'NCIS'].some(f => {
+            const k = findKey(item, f);
+            return k && (item[k]?.includes('유해') || item[k]?.includes('유독'));
           });
         });
 
         const details = document.createElement('details');
         const summary = document.createElement('summary');
-        const casDisplay = hasDanger
-          ? `<span class="red-text">CAS No.: ${cas}</span>`
-          : `CAS No.: ${cas}`;
-        summary.innerHTML = `📦 ${casDisplay} <span style="color:gray;">(${items.length}개 항목)</span>`;
+        summary.className = danger ? 'red' : '';
+        summary.innerHTML = `<strong>CAS No.:</strong> <span class="${danger ? 'red' : ''}">${cas}</span> <span style="color:gray">(${items.length}개)</span>`;
         details.appendChild(summary);
 
         const table = document.createElement('table');
-        table.className = 'item-table';
+        const header = ['CAS No.', '품목그룹', '품목코드', '브랜드', '구매처', '품목명', '품목이슈', 'NCIS', '유해화학물판매업신고', '유해화학물시약판매업신고', '비고'];
+        table.innerHTML = '<thead><tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
 
-        const fields = ['CAS No.', '품목그룹', '품목코드', '브랜드', '구매처', '품목명', '품목이슈', 'NCIS', '유해화학물 판매업신고', '유해화학물 시약판매업신고', '비고'];
-
-        const headerRow = document.createElement('tr');
-        fields.forEach(field => {
-          const th = document.createElement('th');
-          th.textContent = field;
-          headerRow.appendChild(th);
-        });
-        table.appendChild(headerRow);
-
+        const tbody = document.createElement('tbody');
         items.forEach(item => {
           const row = document.createElement('tr');
-          fields.forEach(field => {
+          header.forEach(h => {
+            const k = findKey(item, h);
+            const val = k ? item[k] || '' : '';
+            const isDanger = ['유해', '유독'].some(word => val.includes(word));
             const td = document.createElement('td');
-            const k = findKey(item, field);
-            const v = item[k] || '';
-            const isDanger = ['유해화학물 판매업신고', '유해화학물 시약판매업신고', '품목그룹', 'NCIS'].includes(field)
-              && (v.includes('유해') || v.includes('유독'));
-            td.innerHTML = isDanger ? `<span class="red-text">${v}</span>` : v;
+            td.innerHTML = val;
+            if (isDanger) td.classList.add('danger');
             row.appendChild(td);
           });
-          table.appendChild(row);
+          tbody.appendChild(row);
         });
-
+        table.appendChild(tbody);
         details.appendChild(table);
         resultsContainer.appendChild(details);
       });
+
+      if (unmatchedCAS.length > 0) {
+        const nf = document.createElement('div');
+        nf.className = 'not-found';
+        nf.innerHTML = '<strong>검색되지 않은 CAS No.:</strong><br>' + unmatchedCAS.join(', ');
+        resultsContainer.appendChild(nf);
+      }
     }
-
-    document.getElementById('excelInput').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function (event) {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        const casList = rows.flat().map(v => v?.toString().trim().toLowerCase()).filter(Boolean);
-
-        filteredData = window.DATA.filter(item => {
-          const casKey = findKey(item, 'CAS No.');
-          const value = casKey ? item[casKey]?.toString().trim().toLowerCase() : '';
-          return casList.includes(value);
-        });
-
-        renderAccordion();
-      };
-      reader.readAsArrayBuffer(file);
-    });
 
     function downloadExcel() {
-      if (filteredData.length === 0) {
-        alert('다운로드할 데이터가 없습니다.');
-        return;
-      }
-      const worksheet = XLSX.utils.json_to_sheet(filteredData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, '검색결과');
-      XLSX.writeFile(workbook, '검색결과.xlsx');
+      if (filteredData.length === 0) return alert('데이터가 없습니다.');
+      const ws = XLSX.utils.json_to_sheet(filteredData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '검색결과');
+      XLSX.writeFile(wb, '검색결과.xlsx');
     }
 
-    function resetSearch() {
-      document.getElementById('excelInput').value = '';
-      document.querySelectorAll('.casInputWrapper').forEach((el, idx) => {
-        if (idx === 0) el.querySelector('input').value = '';
-        else el.remove();
-      });
+    function applyReset() {
+      document.getElementById('casContainer').innerHTML = `
+        <div class="cas-row">
+          <input type="text" class="casInput" placeholder="CAS No. 입력" />
+          <button onclick="addCASInput()">＋</button>
+        </div>`;
       filteredData = [];
       resultsContainer.innerHTML = '';
+      document.getElementById('excelInput').value = '';
+    }
+
+    document.getElementById('excelInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = evt.target.result;
+        let workbook;
+        if (file.name.endsWith('.csv')) {
+          workbook = XLSX.read(data, { type: 'string' });
+        } else {
+          const arr = new Uint8Array(data);
+          workbook = XLSX.read(arr, { type: 'array' });
+        }
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const values = rows.flat().map(v => v?.toString().trim().toLowerCase()).filter(Boolean);
+        applyCASFilter(values);
+      };
+      if (file.name.endsWith('.csv')) reader.readAsText(file);
+      else reader.readAsArrayBuffer(file);
+    });
+
+    function applyCASFilter(casList) {
+      const matchedSet = new Set();
+      filteredData = window.DATA.filter(item => {
+        const key = findKey(item, 'CAS No.');
+        const value = key ? item[key]?.toString().trim().toLowerCase() : '';
+        const matched = casList.includes(value);
+        if (matched) matchedSet.add(value);
+        return matched;
+      });
+      const unmatched = casList.filter(kw => !matchedSet.has(kw));
+      renderAccordion(unmatched);
     }
   </script>
 </body>
