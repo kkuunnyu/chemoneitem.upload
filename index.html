@@ -22,6 +22,7 @@
     h1 {
       text-align: center;
       font-size: 2rem;
+      cursor: pointer;
     }
     .chemone {
       font-family: 'BladeRunner', sans-serif;
@@ -86,28 +87,56 @@
       padding: 1rem;
       margin-top: 2rem;
     }
+    .notice {
+      color: red;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .multi-search-section {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.5rem;
+    }
+    .multi-search-section > * {
+      margin-top: 0.3rem;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="data.js"></script>
 </head>
 <body>
-  <h1><span class="chemone">CHEMONE</span> 품목 조회</h1>
+  <h1 onclick="location.reload()">
+    <span class="chemone">CHEMONE</span> 품목 조회
+  </h1>
 
-  <div class="upload-section">
-    <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" />
-    <button onclick="downloadExcel()">엑셀 다운로드</button>
-  </div>
+<div class="upload-section" style="display: flex; justify-content: flex-end; gap: 1rem;">
+  <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" />
+  <button onclick="downloadExcel()">엑셀 다운로드</button>
+</div>
 
-  <div class="multi-search-section">
-    <div id="casContainer">
-      <div class="cas-row">
-        <input type="text" class="casInput" placeholder="CAS No. 입력" />
-        <button onclick="addCASInput()">＋</button>
-      </div>
+
+<!-- ✅ CAS 입력창 라인 -->
+<div class="multi-search-section">
+  <div style="flex: 1; min-width: 300px;" id="casContainer">
+    <div class="cas-row">
+      <input type="text" class="casInput" placeholder="CAS No. 입력" />
+      <button onclick="addCASInput()">＋</button>
     </div>
+  </div>
+</div>
+
+<!-- ✅ 버튼 + 문구 라인 -->
+<div class="multi-search-section" style="margin-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+  <div>
     <button onclick="applyMultipleCASSearch()">검색</button>
     <button onclick="applyReset()">초기화</button>
   </div>
+  <div class="notice" style="margin-left: auto;">*빨간색 표시된 품목은 유독물질 표시입니다.</div>
+</div>
+
+
+
 
   <div id="resultsContainer"></div>
 
